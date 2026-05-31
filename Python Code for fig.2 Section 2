@@ -1,0 +1,114 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.fft import fft, ifft, fftshift, ifftshift
+import zipfile
+import os
+from google.colab import files
+
+def generate_color_tearing_figure():
+    """Simulates 1D spatial color tearing caused by independent spectral truncation"""
+    N = 1000 # Spatial resolution
+    x = np.linspace(-1, 1, N)
+    
+    # 1. Create a perfect grayscale geometric edge (Step Function)
+    edge_true = np.zeros(N)
+    edge_true[N//2:] = 1.0 
+    
+    # Initialize the RGB channels for the true edge
+    R_true = np.copy(edge_true)
+    G_true = np.copy(edge_true)
+    B_true = np.copy(edge_true)
+    
+    # 2. Transform to Frequency Domain
+    R_f = fftshift(fft(R_true))
+    G_f = fftshift(fft(G_true))
+    B_f = fftshift(fft(B_true))
+    
+    freqs = np.linspace(-np.pi, np.pi, N)
+    
+    # 3. Define the Nash Equilibrium Cutoffs
+    # SCENARIO A: Independent Duel (Noise variance causes different cutoffs)
+    omega_R = 0.15 * np.pi
+    omega_G = 0.35 * np.pi
+    omega_B = 0.60 * np.pi
+    
+    # SCENARIO B: Luminance-Anchored Duel (Unified cutoff)
+    omega_Y = 0.35 * np.pi
+    
+    # Create spectral truncation masks
+    mask_R = np.abs(freqs) <= omega_R
+    mask_G = np.abs(freqs) <= omega_G
+    mask_B = np.abs(freqs) <= omega_B
+    mask_Y = np.abs(freqs) <= omega_Y
+    
+    # 4. Apply Truncation and Inverse FFT
+    # Independent Recovery
+    R_ind = np.real(ifft(ifftshift(R_f * mask_R)))
+    G_ind = np.real(ifft(ifftshift(G_f * mask_G)))
+    B_ind = np.real(ifft(ifftshift(B_f * mask_B)))
+    
+    # Luminance-Anchored Recovery
+    R_vec = np.real(ifft(ifftshift(R_f * mask_Y)))
+    G_vec = np.real(ifft(ifftshift(G_f * mask_Y)))
+    B_vec = np.real(ifft(ifftshift(B_f * mask_Y)))
+    
+    # 5. Plotting the results
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5), dpi=300)
+    
+    # Zoom in on the edge transition
+    zoom_range = slice(N//2 - 100, N//2 + 100)
+    x_zoom = x[zoom_range]
+    
+    # --- LEFT PANEL: Independent Duel (The Failure) ---
+    ax1.plot(x_zoom, R_ind[zoom_range], color='red', linewidth=2, alpha=0.8, label='Red Channel')
+    ax1.plot(x_zoom, G_ind[zoom_range], color='green', linewidth=2, alpha=0.8, label='Green Channel')
+    ax1.plot(x_zoom, B_ind[zoom_range], color='blue', linewidth=2, alpha=0.8, label='Blue Channel')
+    
+    # Highlight the color tearing (divergence between max and min channel)
+    max_envelope = np.maximum.reduce([R_ind, G_ind, B_ind])
+    min_envelope = np.minimum.reduce([R_ind, G_ind, B_ind])
+    ax1.fill_between(x_zoom, min_envelope[zoom_range], max_envelope[zoom_range], color='purple', alpha=0.15, label='Color Tearing Fringe')
+    
+    ax1.set_title("Independent Spectral Duel\n(Phase Misalignment)", fontsize=12, fontweight='bold')
+    ax1.set_ylabel("Spatial Pixel Intensity", fontsize=11)
+    
+    # --- RIGHT PANEL: Luminance Anchored (The Solution) ---
+    ax2.plot(x_zoom, R_vec[zoom_range], color='red', linewidth=4, alpha=0.5, label='Red Channel')
+    ax2.plot(x_zoom, G_vec[zoom_range], color='green', linewidth=2, alpha=0.8, label='Green Channel')
+    ax2.plot(x_zoom, B_vec[zoom_range], color='blue', linewidth=1, alpha=1.0, linestyle='dashed', label='Blue Channel')
+    
+    ax2.set_title("Luminance-Anchored Duel\n(Phase-Locked Chromaticity)", fontsize=12, fontweight='bold')
+    
+    # Formatting both axes
+    for ax in [ax1, ax2]:
+        ax.axvline(0, color='black', linestyle=':', alpha=0.5)
+        ax.set_xlabel("Spatial Distance Across Edge", fontsize=11)
+        ax.set_xlim(-0.15, 0.15)
+        ax.set_ylim(-0.1, 1.2)
+        ax.grid(True, linestyle='--', alpha=0.4)
+        ax.legend(loc='lower right', fontsize=9)
+    
+    plt.tight_layout()
+    
+    # Save the figure
+    filename = 'fig_color_tearing.png'
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+    print(f"Generated: {filename}")
+    return filename
+
+def create_and_download_zip(file_list, zip_name='paper5_fig2.zip'):
+    """Zips the generated figures and triggers an automatic Colab download"""
+    with zipfile.ZipFile(zip_name, 'w') as archive:
+        for file in file_list:
+            if os.path.exists(file):
+                archive.write(file)
+                print(f"Added {file} to {zip_name}")
+                
+    print(f"\nSuccessfully created {zip_name}. Prompting browser download...")
+    files.download(zip_name)
+
+# Execute the generation, zip, and download process
+if __name__ == "__main__":
+    fig_file = generate_color_tearing_figure()
+    create_and_download_zip([fig_file])
