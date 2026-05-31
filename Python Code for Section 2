@@ -1,0 +1,87 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import zipfile
+import os
+from google.colab import files
+
+def generate_spectral_duel_figure():
+    """Generates the Spectral Duel visualization based on Theorem 2.1"""
+    # Frequency domain from 0 to pi (normalized)
+    omega = np.linspace(0, np.pi, 500)
+    
+    # 1. Define the Optical Blur Transfer Function (Gaussian Blur)
+    sigma_b = 0.8
+    H_omega_sq = np.exp(-(omega**2) / (2 * sigma_b**2))
+    
+    # 2. Define the Regularization baseline (Gamma)
+    gamma = 0.15
+    
+    # 3. Calculate Shooting Accuracies
+    P_D = H_omega_sq / (H_omega_sq + gamma)
+    P_A = gamma / (H_omega_sq + gamma)
+    
+    # Find the Nash Equilibrium (intersection where P_D == P_A)
+    idx_nash = np.argmin(np.abs(P_D - P_A))
+    omega_nash = omega[idx_nash]
+    acc_nash = P_D[idx_nash]
+    
+    # 4. Plotting the Duel
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=300)
+    
+    # Fill areas to show the "Risk Penalty" integrals
+    ax.fill_between(omega, P_A, 0, where=(omega < omega_nash), color='red', alpha=0.1, label="Attacker Penalty (Amplified Noise)")
+    ax.fill_between(omega, P_D, 0, where=(omega > omega_nash), color='blue', alpha=0.1, label="Defender Penalty (Lost Structure)")
+    
+    # Plot accuracy lines
+    ax.plot(omega, P_D, color='#1f77b4', linewidth=3, label=r'Defender Accuracy $P_D(\omega)$')
+    ax.plot(omega, P_A, color='#d62728', linewidth=3, label=r'Attacker Accuracy $P_A(\omega)$')
+    
+    # --- THE FIX: Enhanced Annotation with Bounding Box ---
+    ax.plot(omega_nash, acc_nash, 'ko', markersize=10, zorder=5)
+    ax.vlines(omega_nash, 0, acc_nash, colors='k', linestyles='dashed', linewidth=2)
+    ax.annotate(r'Nash Equilibrium Cutoff $\omega^*$', 
+                xy=(omega_nash, acc_nash), 
+                xytext=(omega_nash + 0.25, acc_nash - 0.35), # Moved down into empty space
+                arrowprops=dict(facecolor='black', shrink=0.05, width=1.5, headwidth=6, connectionstyle="arc3,rad=-0.1"),
+                fontsize=11, fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="black", alpha=0.9), # Opaque background
+                zorder=10) # Force to top layer
+    
+    # Formatting
+    ax.set_title("Zero-Sum Spectral Duel: Deblurring under Adversarial Noise", fontsize=14, fontweight='bold', pad=15)
+    ax.set_xlabel(r"Spatial Frequency Arena $\omega$ (from $0$ to $\pi$)", fontsize=12)
+    ax.set_ylabel("Shooting Accuracy (Spectral Dominance)", fontsize=12)
+    ax.set_xlim(0, np.pi)
+    ax.set_ylim(0, 1.05)
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # X-axis ticks using Pi
+    ax.set_xticks([0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi])
+    ax.set_xticklabels(['$0$', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$', r'$\pi$'], fontsize=12)
+    
+    # Keep legend outside the plot area
+    ax.legend(loc='center left', bbox_to_anchor=(1.03, 0.5), fontsize=11, framealpha=0.9)
+    plt.tight_layout()
+    
+    # Save the figure
+    filename = 'fig_spectral_duel.png'
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+    print(f"Generated: {filename}")
+    return filename
+
+def create_and_download_zip(file_list, zip_name='paper5_sec2_figures.zip'):
+    """Zips the generated figures and triggers an automatic Colab download"""
+    with zipfile.ZipFile(zip_name, 'w') as archive:
+        for file in file_list:
+            if os.path.exists(file):
+                archive.write(file)
+                print(f"Added {file} to {zip_name}")
+                
+    print(f"\nSuccessfully created {zip_name}. Prompting browser download...")
+    files.download(zip_name)
+
+# Execute the generation, zip, and download process
+if __name__ == "__main__":
+    fig_file = generate_spectral_duel_figure()
+    create_and_download_zip([fig_file])
