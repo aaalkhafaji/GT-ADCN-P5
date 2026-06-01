@@ -1,0 +1,77 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import zipfile
+import os
+from google.colab import files
+
+def generate_benchmark_figure():
+    """Generates the SSIM benchmark bar chart for Section IV"""
+    
+    # Datasets
+    labels = ['Lena (Smooth)', 'Mandrill (Texture)', 'Peppers (Edges)']
+    
+    # SSIM Data from Table IV
+    classical_ssim = [0.612, 0.490, 0.585]
+    game_ssim = [0.845, 0.710, 0.822]
+    
+    x = np.arange(len(labels))  # the label locations
+    width = 0.35  # the width of the bars
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=300)
+    
+    # Create grouped bars
+    rects1 = ax.bar(x - width/2, classical_ssim, width, label='Classical Pipeline (Wiener + BM3D)', color='#1f77b4', edgecolor='black', alpha=0.85)
+    rects2 = ax.bar(x + width/2, game_ssim, width, label='Game-Theoretic (Duel + Congestion)', color='#2ca02c', edgecolor='black', alpha=0.9)
+
+    # Add text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('Structural Similarity Index (SSIM)', fontsize=12, fontweight='bold')
+    ax.set_title('Geometric Preservation under Adversarial Attack', fontsize=14, fontweight='bold', pad=15)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=12)
+    ax.set_ylim(0, 1.0)
+    
+    # Add a subtle grid for readability
+    ax.yaxis.grid(True, linestyle='--', alpha=0.6)
+    ax.set_axisbelow(True)
+
+    # Attach a text label above each bar, displaying its value
+    def autolabel(rects):
+        """Attach a text label above each bar in *rects*, displaying its height."""
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate(f'{height:.3f}',
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+    autolabel(rects1)
+    autolabel(rects2)
+
+    # Move legend outside to keep the chart clean
+    ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), fontsize=11, framealpha=0.95)
+
+    plt.tight_layout()
+    
+    # Save the figure
+    filename = 'fig_benchmark_chart.png'
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+    print(f"Generated: {filename}")
+    return filename
+
+def create_and_download_zip(file_list, zip_name='paper5_sec4_figures.zip'):
+    """Zips the generated figures and triggers an automatic Colab download"""
+    with zipfile.ZipFile(zip_name, 'w') as archive:
+        for file in file_list:
+            if os.path.exists(file):
+                archive.write(file)
+                print(f"Added {file} to {zip_name}")
+                
+    print(f"\nSuccessfully created {zip_name}. Prompting browser download...")
+    files.download(zip_name)
+
+# Execute the generation, zip, and download process
+if __name__ == "__main__":
+    fig_file = generate_benchmark_figure()
+    create_and_download_zip([fig_file])
