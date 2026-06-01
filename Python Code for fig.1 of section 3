@@ -1,0 +1,97 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import zipfile
+import os
+from google.colab import files
+
+def generate_congestion_figure():
+    """Generates the Player-Specific Congestion Game visualization"""
+    # Block load (number of patches in the 3D block)
+    # Start at k=1 (a patch is always in its own block initially)
+    k_j = np.linspace(1, 30, 300)
+    
+    # Global parameters
+    sigma_sq = 150.0  # Noise variance
+    alpha = 0.5       # Congestion scaling
+    
+    # Variance reduction term (universal to all players)
+    # Cost drops as -sigma^2/k
+    variance_reduction = - (sigma_sq / k_j)
+    
+    # Define three patches with different geometric distances to the centroid
+    dist_A = 0.1   # Patch A: Near perfect match (flat region)
+    dist_B = 1.2   # Patch B: Slight deviation (texture)
+    dist_C = 4.5   # Patch C: Outlier (crosses a geometric edge)
+    
+    # Calculate Total Player-Specific Costs: C_i = (alpha * dist * k) - (sigma^2 / k)
+    cost_A = (alpha * dist_A * k_j) + variance_reduction
+    cost_B = (alpha * dist_B * k_j) + variance_reduction
+    cost_C = (alpha * dist_C * k_j) + variance_reduction
+    
+    # Find the Nash Equilibrium minimums (optimal stopping points)
+    min_idx_A = np.argmin(cost_A)
+    min_idx_B = np.argmin(cost_B)
+    min_idx_C = np.argmin(cost_C)
+    
+    # Plotting
+    fig, ax = plt.subplots(figsize=(8, 5.5), dpi=300)
+    
+    # Plot universal variance reduction baseline
+    ax.plot(k_j, variance_reduction, color='grey', linestyle='--', linewidth=2, alpha=0.5, label=r'Pure Variance Reduction ($-\sigma_\eta^2 / k_j$)')
+    
+    # Plot individual patch costs
+    ax.plot(k_j, cost_A, color='#2ca02c', linewidth=3, label='Patch A (Perfect Match)')
+    ax.plot(k_j, cost_B, color='#ff7f0e', linewidth=3, label='Patch B (Slight Deviation)')
+    ax.plot(k_j, cost_C, color='#d62728', linewidth=3, label='Patch C (Edge Outlier)')
+    
+    # Mark the equilibrium points
+    ax.plot(k_j[min_idx_A], cost_A[min_idx_A], 'ko', markersize=8, zorder=5)
+    ax.plot(k_j[min_idx_B], cost_B[min_idx_B], 'ko', markersize=8, zorder=5)
+    ax.plot(k_j[min_idx_C], cost_C[min_idx_C], 'ko', markersize=8, zorder=5)
+    
+    # Add vertical drop lines for clarity
+    ax.vlines(k_j[min_idx_A], -150, cost_A[min_idx_A], colors='#2ca02c', linestyles='dotted', linewidth=2)
+    ax.vlines(k_j[min_idx_B], -150, cost_B[min_idx_B], colors='#ff7f0e', linestyles='dotted', linewidth=2)
+    ax.vlines(k_j[min_idx_C], -150, cost_C[min_idx_C], colors='#d62728', linestyles='dotted', linewidth=2)
+    
+    # Annotations to show where they "defect"
+    ax.annotate(f'Nash Opt: k={int(k_j[min_idx_C])}', xy=(k_j[min_idx_C], cost_C[min_idx_C]), xytext=(k_j[min_idx_C]+1, cost_C[min_idx_C]+30),
+                arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=5), fontsize=10, fontweight='bold', bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="black", alpha=0.8))
+                
+    ax.annotate(f'Nash Opt: k={int(k_j[min_idx_B])}', xy=(k_j[min_idx_B], cost_B[min_idx_B]), xytext=(k_j[min_idx_B]+1, cost_B[min_idx_B]+30),
+                arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=5), fontsize=10, fontweight='bold', bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="black", alpha=0.8))
+
+    # Formatting
+    ax.set_title("Player-Specific Congestion:\nBalancing Denoising vs. Structural Blur", fontsize=14, fontweight='bold', pad=15)
+    ax.set_xlabel(r"Resource Load $k_j$ (Number of Patches in 3D Block)", fontsize=12)
+    ax.set_ylabel(r"Total Player Cost $C_{i,j}(k_j)$", fontsize=12)
+    ax.set_xlim(1, 30)
+    ax.set_ylim(-160, 100)
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # Legend outside plot to prevent overlap
+    ax.legend(loc='center left', bbox_to_anchor=(1.03, 0.5), fontsize=11, framealpha=0.9)
+    plt.tight_layout()
+    
+    # Save the figure
+    filename = 'fig_congestion_game.png'
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+    print(f"Generated: {filename}")
+    return filename
+
+def create_and_download_zip(file_list, zip_name='paper5_sec3_figures.zip'):
+    """Zips the generated figures and triggers an automatic Colab download"""
+    with zipfile.ZipFile(zip_name, 'w') as archive:
+        for file in file_list:
+            if os.path.exists(file):
+                archive.write(file)
+                print(f"Added {file} to {zip_name}")
+                
+    print(f"\nSuccessfully created {zip_name}. Prompting browser download...")
+    files.download(zip_name)
+
+# Execute the generation, zip, and download process
+if __name__ == "__main__":
+    fig_file = generate_congestion_figure()
+    create_and_download_zip([fig_file])
